@@ -28,16 +28,21 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 달력 -->
     <div class="lg:col-span-2 overflow-x-auto">
       <table class="w-full bg-white rounded-lg shadow text-center">
         <thead class="bg-indigo-100">
-          <tr><th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
+          <tr>
+            <th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
+          </tr>
         </thead>
         <tbody id="adminCalendar" class="divide-y"></tbody>
       </table>
     </div>
 
+    <!-- 우측: 기간 설정 + 상세 + NICU 목록 -->
     <div class="space-y-6">
+      <!-- 신청 기간 설정 -->
       <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-2">신청 기간 설정</h2>
         <form id="periodForm" class="space-y-3">
@@ -60,11 +65,13 @@
         <ul id="periodList" class="mt-4 space-y-2 text-sm text-gray-700"></ul>
       </div>
 
+      <!-- 상세 -->
       <div id="details" class="bg-white p-4 rounded-lg shadow">
         <h2 id="detailDate" class="text-xl font-semibold mb-2">날짜 선택</h2>
         <ul id="detailList" class="space-y-2"></ul>
       </div>
 
+      <!-- NICU 목록 -->
       <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-2">NICU</h2>
         <ul id="whitelist" class="grid grid-cols-3 gap-2"></ul>
@@ -74,6 +81,7 @@
 
   <script>
   window.addEventListener('DOMContentLoaded', () => {
+    // Storage helpers
     const getData       = () => JSON.parse(localStorage.getItem('app_data')      || '{}');
     const saveData      = d => localStorage.setItem('app_data',      JSON.stringify(d));
     const getAdminAdds  = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
@@ -81,6 +89,7 @@
     const getPeriods    = () => JSON.parse(localStorage.getItem('app_periods')  || '{}');
     const savePeriods   = p => localStorage.setItem('app_periods', JSON.stringify(p));
 
+    // Whitelist names
     const allowedNames = [
       "천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수",
       "전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수",
@@ -89,6 +98,7 @@
       "박희연","원유미","인휘"
     ];
 
+    // DOM refs
     const adminCal   = document.getElementById('adminCalendar'),
           detailDate = document.getElementById('detailDate'),
           detailList = document.getElementById('detailList'),
@@ -112,6 +122,7 @@
     prevMonth.onclick = () => { cur.setMonth(cur.getMonth()-1); renderCalendar(); };
     nextMonth.onclick = () => { cur.setMonth(cur.getMonth()+1); renderCalendar(); };
 
+    // Render saved periods
     function renderPeriods() {
       const p = getPeriods();
       periodList.innerHTML = '';
@@ -125,11 +136,14 @@
             <img src="https://img.icons8.com/ios-glyphs/30/000000/multiply.png" class="img-btn" data-action="delete" data-ym="${ym}"/>
           </div>`;
         periodList.appendChild(li);
+        // disable selected month
         const opt = [...monthInput.options].find(o=>o.value===ym);
         if(opt) opt.disabled = true;
       });
     }
+    renderPeriods();
 
+    // Handle form submit
     periodForm.onsubmit = e => {
       e.preventDefault();
       const ym = monthInput.value, s = startInput.value, en = endInput.value;
@@ -142,18 +156,18 @@
       renderPeriods();
     };
 
+    // Edit/Delete period
     periodList.addEventListener('click', e => {
-      const action = e.target.dataset.action;
-      const ym = e.target.dataset.ym;
+      const act = e.target.dataset.action, ym = e.target.dataset.ym;
       const p = getPeriods();
-      if(action==='delete'){
-        if(confirm('해당 기간을 삭제하시겠습니까?')){
+      if(act==='delete') {
+        if(confirm('해당 기간을 삭제하시겠습니까?')) {
           delete p[ym];
           savePeriods(p);
           renderPeriods();
         }
       }
-      if(action==='edit'){
+      if(act==='edit') {
         const val = p[ym];
         monthInput.value = ym;
         startInput.value = val.start.slice(0,16);
@@ -161,31 +175,34 @@
       }
     });
 
+    // Draw calendar
     function renderCalendar(){
       adminCal.innerHTML = '';
       const year = cur.getFullYear(), mo = cur.getMonth();
       monthLabel.textContent = `${year}년 ${mo+1}월`;
       const first = new Date(year,mo,1).getDay();
-      const days  = new Date(year,mo+1,0).getDate();
+      const days = new Date(year,mo+1,0).getDate();
       let row = document.createElement('tr');
       for(let i=0;i<first;i++) row.appendChild(document.createElement('td'));
       const data = getData(), adds = getAdminAdds();
-      for(let d=1;d<=days;d++){
-        if((first+d-1)%7===0&&d!==1){ adminCal.appendChild(row); row=document.createElement('tr'); }
+      for(let d=1; d<=days; d++){
+        if((first+d-1)%7===0 && d!==1){ adminCal.appendChild(row); row=document.createElement('tr'); }
         const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const users = data[ds]||[], admins = adds[ds]||[];
         const names = users.concat(admins.map(n=>'👑 '+n));
         const td = document.createElement('td');
-        td.className = names.length? 'cell-booked p-2':'cell-open p-2';
+        td.className = names.length ? 'cell-booked p-2' : 'cell-open p-2';
         td.innerHTML = `<div class="font-semibold mb-1">${d}</div>` +
                        names.map(n=>`<div class="text-sm">${n}</div>`).join('');
         td.onclick = ()=>showDetails(ds);
         row.appendChild(td);
       }
-      while(row.children.length<7) row.appendChild(document.createElement('td'));
+      while(row.children.length < 7) row.appendChild(document.createElement('td'));
       adminCal.appendChild(row);
     }
+    renderCalendar();
 
+    // Show detail & NICU list
     function showDetails(date){
       selectedDate = date;
       detailDate.textContent = `예약자 목록 — ${date}`;
@@ -195,9 +212,9 @@
 
       users.forEach((n,i)=>{
         const li = document.createElement('li');
-        li.className='flex justify-between items-center';
-        li.innerHTML=`<span>${i+1}. ${n}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick=()=>{
+        li.className = 'flex justify-between items-center';
+        li.innerHTML = `<span>${i+1}. ${n}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = ()=>{
           if(confirm('취소하시겠습니까?')){
             const u = users.filter(x=>x!==n);
             if(u.length) data[date]=u; else delete data[date];
@@ -209,9 +226,9 @@
 
       admins.forEach((n,i)=>{
         const li = document.createElement('li');
-        li.className='flex justify-between items-center admin-added';
-        li.innerHTML=`<span>${users.length+i+1}. 👑 ${n}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick=()=>{
+        li.className = 'flex justify-between items-center admin-added';
+        li.innerHTML = `<span>${users.length+i+1}. 👑 ${n}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = ()=>{
           if(confirm('취소하시겠습니까?')){
             const a = admins.filter(x=>x!==n);
             if(a.length) adds[date]=a; else delete adds[date];
@@ -221,12 +238,12 @@
         detailList.appendChild(li);
       });
 
-      if(!users.length&&!admins.length) detailList.textContent='예약자가 없습니다.';
+      if(!users.length && !admins.length) detailList.textContent = '예약자가 없습니다.';
 
       whitelist.innerHTML = '';
       allowedNames.slice().sort((a,b)=>a.localeCompare(b,'ko')).forEach(n=>{
         const li = document.createElement('li');
-        li.className='flex justify-center';
+        li.className = 'flex justify-center';
         const btn = document.createElement('button');
         btn.textContent = n;
         btn.className = 'btn-admin w-full';
@@ -236,16 +253,13 @@
         } else {
           btn.onclick = ()=>{
             adds[date] = [...(adds[date]||[]), n];
-            saveAdminAdds(adds);
-            renderCalendar(); showDetails(date);
+            saveAdminAdds(adds); renderCalendar(); showDetails(date);
           };
         }
-        li.appendChild(btn); whitelist.appendChild(li);
+        li.appendChild(btn);
+        whitelist.appendChild(li);
       });
     }
-
-    renderPeriods();
-    renderCalendar();
   });
   </script>
 </body>

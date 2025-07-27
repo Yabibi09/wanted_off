@@ -9,6 +9,9 @@
     .btn-admin {
       @apply px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition;
     }
+    .btn-nav {
+      @apply px-4 py-2 bg-indigo-500 text-white rounded-full shadow hover:bg-indigo-600 transition;
+    }
     .cell-booked { @apply bg-red-100; }
     .cell-open   { @apply bg-green-100 cursor-pointer hover:bg-green-200; }
     .admin-added { @apply font-bold bg-yellow-200; }
@@ -22,9 +25,9 @@
 
   <!-- 월 네비게이션 -->
   <div class="flex items-center justify-center mb-4 space-x-4">
-    <button id="prevMonth" class="btn-admin bg-gray-300 text-gray-800 hover:bg-gray-400">‹ 이전월</button>
+    <button id="prevMonth" class="btn-nav">‹ 이전월</button>
     <span id="monthLabel" class="text-xl font-semibold"></span>
-    <button id="nextMonth" class="btn-admin bg-gray-300 text-gray-800 hover:bg-gray-400">다음월 ›</button>
+    <button id="nextMonth" class="btn-nav">다음월 ›</button>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -74,44 +77,37 @@
       localStorage.removeItem('app_current');
       location.href = 'index.html';
     };
-
     prevMonth.onclick = () => { cur.setMonth(cur.getMonth() - 1); renderCalendar(); };
     nextMonth.onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCalendar(); };
 
     function renderCalendar() {
       adminCal.innerHTML = '';
-      const year   = cur.getFullYear();
-      const month  = cur.getMonth();
+      const year  = cur.getFullYear(), month = cur.getMonth();
       monthLabel.textContent = `${year}년 ${month+1}월`;
 
       const first = new Date(year, month, 1).getDay();
       const days  = new Date(year, month+1, 0).getDate();
       let row = document.createElement('tr');
-
-      for (let i = 0; i < first; i++) row.appendChild(document.createElement('td'));
+      for (let i=0; i<first; i++) row.appendChild(document.createElement('td'));
 
       const data      = getData();
       const adminAdds = getAdminAdds();
 
-      for (let d = 1; d <= days; d++) {
-        if ((first + d - 1) % 7 === 0 && d !== 1) {
-          adminCal.appendChild(row);
-          row = document.createElement('tr');
-        }
+      for (let d=1; d<=days; d++) {
+        if ((first + d - 1)%7===0 && d!==1) { adminCal.appendChild(row); row=document.createElement('tr'); }
         const ds    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const users = data[ds]      || [];
-        const adds  = getAdminAdds()[ds] || [];
-        const names = users.concat(adds.map(n => `👑 ${n}`));
+        const users = data[ds]     || [];
+        const adds  = adminAdds[ds]|| [];
+        const names = users.concat(adds.map(n=>'👑 '+n));
 
         const td = document.createElement('td');
-        td.className = names.length > 0 ? 'cell-booked p-2' : 'cell-open p-2';
+        td.className = names.length>0 ? 'cell-booked p-2' : 'cell-open p-2';
         td.innerHTML = `<div class="font-semibold mb-1">${d}</div>` +
                        names.map(n=>`<div class="text-sm">${n}</div>`).join('');
         td.onclick = () => showDetails(ds);
         row.appendChild(td);
       }
-
-      while (row.children.length < 7) row.appendChild(document.createElement('td'));
+      while(row.children.length<7) row.appendChild(document.createElement('td'));
       adminCal.appendChild(row);
     }
 
@@ -122,64 +118,49 @@
 
       const data      = getData();
       const adminAdds = getAdminAdds();
-      const users     = data[date]      || [];
-      const adds      = adminAdds[date] || [];
+      const users     = data[date]     || [];
+      const adds      = adminAdds[date]|| [];
 
-      users.forEach((name,i) => {
+      users.forEach((name,i)=>{
         const li = document.createElement('li');
-        li.className = 'flex justify-between items-center';
-        li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick = () => {
-          if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
-          const updated = users.filter(n=>n!==name);
-          if (updated.length) data[date] = updated; else delete data[date];
-          saveData(data);
-          renderCalendar(); showDetails(date);
+        li.className='flex justify-between items-center';
+        li.innerHTML=`<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick=()=>{
+          if(!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
+          const u = users.filter(n=>n!==name);
+          if(u.length) data[date]=u; else delete data[date];
+          saveData(data); renderCalendar(); showDetails(date);
         };
         detailList.appendChild(li);
       });
 
-      adds.forEach((name,i) => {
+      adds.forEach((name,i)=>{
         const li = document.createElement('li');
-        li.className = 'flex justify-between items-center admin-added';
-        li.innerHTML = `<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick = () => {
-          if (!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
-          const updated = adds.filter(n=>n!==name);
-          if (updated.length) adminAdds[date] = updated; else delete adminAdds[date];
-          saveAdminAdds(adminAdds);
-          renderCalendar(); showDetails(date);
+        li.className='flex justify-between items-center admin-added';
+        li.innerHTML=`<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick=()=>{
+          if(!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
+          const a = adds.filter(n=>n!==name);
+          if(a.length) adminAdds[date]=a; else delete adminAdds[date];
+          saveAdminAdds(adminAdds); renderCalendar(); showDetails(date);
         };
         detailList.appendChild(li);
       });
 
-      if (users.length===0 && adds.length===0) {
-        detailList.textContent = '예약자가 없습니다.';
-      }
+      if(users.length===0&&adds.length===0) detailList.textContent='예약자가 없습니다.';
 
-      // NICU 목록 (가나다순, 3열)
-      whitelist.innerHTML = '';
-      const namesList = [...allowedNames].sort((a,b)=>a.localeCompare(b,'ko'));
-      namesList.forEach(name => {
-        const li = document.createElement('li');
-        li.className = 'flex justify-center';
-        const btn = document.createElement('button');
-        btn.textContent = name;
-        btn.className = 'btn-admin w-full';
-        const already  = users.includes(name) || adds.includes(name);
-        const totalCnt = users.length + adds.length;
-        if (already || totalCnt >= 3) {
-          btn.disabled = true;
-          btn.classList.add('disabled');
-        } else {
-          btn.onclick = () => {
-            adminAdds[date] = (adminAdds[date]||[]).concat(name);
-            saveAdminAdds(adminAdds);
-            renderCalendar(); showDetails(date);
-          };
-        }
-        li.appendChild(btn);
-        whitelist.appendChild(li);
+      whitelist.innerHTML='';
+      const namesList=[...allowedNames].sort((a,b)=>a.localeCompare(b,'ko'));
+      namesList.forEach(name=>{
+        const li=document.createElement('li');
+        li.className='flex justify-center';
+        const btn=document.createElement('button');
+        btn.textContent=name; btn.className='btn-admin w-full';
+        const already=users.includes(name)||adds.includes(name);
+        const totalCnt=users.length+adds.length;
+        if(already||totalCnt>=3){ btn.disabled=true; btn.classList.add('disabled'); }
+        else btn.onclick=()=>{ adminAdds[date]=[...(adminAdds[date]||[]),name]; saveAdminAdds(adminAdds); renderCalendar(); showDetails(date); };
+        li.appendChild(btn); whitelist.appendChild(li);
       });
     }
 

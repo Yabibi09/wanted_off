@@ -20,14 +20,19 @@
   <h1 class="text-3xl font-bold mb-6">⚙️ 관리자 모드</h1>
   <button id="logoutAdmin" class="btn-admin mb-4">로그아웃</button>
 
+  <!-- 월 네비게이션 -->
+  <div class="flex items-center justify-center mb-4 space-x-4">
+    <button id="prevMonth" class="btn-admin bg-gray-300 text-gray-800 hover:bg-gray-400">‹ 이전월</button>
+    <span id="monthLabel" class="text-xl font-semibold"></span>
+    <button id="nextMonth" class="btn-admin bg-gray-300 text-gray-800 hover:bg-gray-400">다음월 ›</button>
+  </div>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- 달력 영역 -->
     <div class="lg:col-span-2 overflow-x-auto">
       <table class="w-full bg-white rounded-lg shadow text-center">
         <thead class="bg-indigo-100">
-          <tr>
-            <th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
-          </tr>
+          <tr><th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
         </thead>
         <tbody id="adminCalendar" class="divide-y"></tbody>
       </table>
@@ -54,11 +59,14 @@
     const saveAdminAdds = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
     const allowedNames  = ["천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수","전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영","박희연","원유미","인휘"];
 
-    const adminCal   = document.getElementById('adminCalendar');
-    const detailDate = document.getElementById('detailDate');
-    const detailList = document.getElementById('detailList');
-    const whitelist  = document.getElementById('whitelist');
-    const logoutBtn  = document.getElementById('logoutAdmin');
+    const adminCal    = document.getElementById('adminCalendar');
+    const detailDate  = document.getElementById('detailDate');
+    const detailList  = document.getElementById('detailList');
+    const whitelist   = document.getElementById('whitelist');
+    const logoutBtn   = document.getElementById('logoutAdmin');
+    const prevMonth   = document.getElementById('prevMonth');
+    const nextMonth   = document.getElementById('nextMonth');
+    const monthLabel  = document.getElementById('monthLabel');
 
     let cur = new Date(), selectedDate = '';
 
@@ -67,27 +75,32 @@
       location.href = 'index.html';
     };
 
+    prevMonth.onclick = () => { cur.setMonth(cur.getMonth() - 1); renderCalendar(); };
+    nextMonth.onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCalendar(); };
+
     function renderCalendar() {
       adminCal.innerHTML = '';
-      const year  = cur.getFullYear(),
-            month = cur.getMonth(),
-            first = new Date(year, month, 1).getDay(),
-            days  = new Date(year, month+1, 0).getDate();
+      const year   = cur.getFullYear();
+      const month  = cur.getMonth();
+      monthLabel.textContent = `${year}년 ${month+1}월`;
+
+      const first = new Date(year, month, 1).getDay();
+      const days  = new Date(year, month+1, 0).getDate();
       let row = document.createElement('tr');
 
-      for (let i=0; i<first; i++) row.appendChild(document.createElement('td'));
+      for (let i = 0; i < first; i++) row.appendChild(document.createElement('td'));
 
       const data      = getData();
       const adminAdds = getAdminAdds();
 
-      for (let d=1; d<=days; d++) {
+      for (let d = 1; d <= days; d++) {
         if ((first + d - 1) % 7 === 0 && d !== 1) {
           adminCal.appendChild(row);
           row = document.createElement('tr');
         }
         const ds    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const users = data[ds]      || [];
-        const adds  = adminAdds[ds] || [];
+        const adds  = getAdminAdds()[ds] || [];
         const names = users.concat(adds.map(n => `👑 ${n}`));
 
         const td = document.createElement('td');
@@ -112,14 +125,13 @@
       const users     = data[date]      || [];
       const adds      = adminAdds[date] || [];
 
-      // 사용자 예약
-      users.forEach((name, i) => {
+      users.forEach((name,i) => {
         const li = document.createElement('li');
         li.className = 'flex justify-between items-center';
         li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
         li.querySelector('button').onclick = () => {
           if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
-          const updated = users.filter(n => n !== name);
+          const updated = users.filter(n=>n!==name);
           if (updated.length) data[date] = updated; else delete data[date];
           saveData(data);
           renderCalendar(); showDetails(date);
@@ -127,14 +139,13 @@
         detailList.appendChild(li);
       });
 
-      // 관리자 추가 예약
-      adds.forEach((name, i) => {
+      adds.forEach((name,i) => {
         const li = document.createElement('li');
         li.className = 'flex justify-between items-center admin-added';
         li.innerHTML = `<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
         li.querySelector('button').onclick = () => {
           if (!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
-          const updated = adds.filter(n => n !== name);
+          const updated = adds.filter(n=>n!==name);
           if (updated.length) adminAdds[date] = updated; else delete adminAdds[date];
           saveAdminAdds(adminAdds);
           renderCalendar(); showDetails(date);
@@ -142,27 +153,27 @@
         detailList.appendChild(li);
       });
 
-      if (users.length === 0 && adds.length === 0) {
+      if (users.length===0 && adds.length===0) {
         detailList.textContent = '예약자가 없습니다.';
       }
 
       // NICU 목록 (가나다순, 3열)
       whitelist.innerHTML = '';
-      const namesList = [...allowedNames].sort((a, b) => a.localeCompare(b, 'ko'));
+      const namesList = [...allowedNames].sort((a,b)=>a.localeCompare(b,'ko'));
       namesList.forEach(name => {
         const li = document.createElement('li');
         li.className = 'flex justify-center';
         const btn = document.createElement('button');
         btn.textContent = name;
         btn.className = 'btn-admin w-full';
-        const allCount = users.length + adds.length;
-        const already = users.includes(name) || adds.includes(name);
-        if (already || allCount >= 3) {
+        const already  = users.includes(name) || adds.includes(name);
+        const totalCnt = users.length + adds.length;
+        if (already || totalCnt >= 3) {
           btn.disabled = true;
           btn.classList.add('disabled');
         } else {
           btn.onclick = () => {
-            adminAdds[date] = (adminAdds[date] || []).concat(name);
+            adminAdds[date] = (adminAdds[date]||[]).concat(name);
             saveAdminAdds(adminAdds);
             renderCalendar(); showDetails(date);
           };

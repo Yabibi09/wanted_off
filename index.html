@@ -70,6 +70,7 @@
     const INACTIVITY_LIMIT = 10*60*1000;
     const allowedNames = ["admin","천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수","전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영","박희연","원유미","인휘"];
 
+    // Storage helpers
     const getUsers       = () => JSON.parse(localStorage.getItem('app_users')   || '[]');
     const saveUsers      = u => localStorage.setItem('app_users', JSON.stringify(u));
     const getData        = () => JSON.parse(localStorage.getItem('app_data')    || '{}');
@@ -78,6 +79,7 @@
     const saveAdminAdds  = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
     const updateActivity = () => localStorage.setItem('lastActivity', Date.now());
 
+    // DOM refs
     const authDiv      = document.getElementById('auth'),
           formLogin    = document.getElementById('formLogin'),
           formRegister = document.getElementById('formRegister'),
@@ -121,20 +123,22 @@
     document.getElementById('next').onclick=()=>{cur.setMonth(cur.getMonth()+1);renderCalendar();};
     applyBtn.onclick=()=>applySelected();
 
+    // 한 달 누적 신청 일수 계산 (관리자 예약 포함)
     function countThisMonth(user,data,yy,mm){
       const adminAdds=getAdminAdds();
       return Object.entries(data).filter(([date,arr])=>{
         if(!date.startsWith(`${yy}-${String(mm+1).padStart(2,'0')}`))return false;
-        return arr.includes(user)||(adminAdds[date]||[]).includes(user);
+        const admins=adminAdds[date]||[];
+        return arr.includes(user)||admins.includes(user);
       }).length;
     }
 
     function applySelected(){
-      const data=getData(),adminAdds=getAdminAdds(),y=cur.getFullYear(),m=cur.getMonth(),exist=countThisMonth(currentUser,data,y,m);
+      const data=getData(),admins=getAdminAdds(),y=cur.getFullYear(),m=cur.getMonth(),exist=countThisMonth(currentUser,data,y,m);
       if(exist+selected.length>8){alert(`한 달 최대 8일(현재 ${exist}일) 초과`);return;}
       selected.forEach(ds=>{
-        const arr=data[ds]||[], admins=getAdminAdds()[ds]||[];
-        if(arr.length+admins.length<3&&!arr.includes(currentUser)&&!admins.includes(currentUser))arr.push(currentUser);
+        const arr=data[ds]||[], adm=admins[ds]||[];
+        if(arr.length+adm.length<3&&!arr.includes(currentUser)&&!adm.includes(currentUser))arr.push(currentUser);
         data[ds]=arr;
       });
       saveData(data);selected=[];renderCalendar();renderMyList();updateSelectionUI();
@@ -145,20 +149,19 @@
       const first=new Date(cur.getFullYear(),cur.getMonth(),1).getDay(),days=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
       let row=document.createElement('tr');
       for(let i=0;i<first;i++)row.appendChild(makeCell(''));
-      const data=getData(),adminAdds=getAdminAdds();
+      const data=getData(),admins=getAdminAdds();
       for(let d=1;d<=days;d++){
         if((first+d-1)%7===0&&d!==1){calBody.appendChild(row);row=document.createElement('tr');}
         const ds=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const arr=data[ds]||[];
-        row.appendChild(makeCell(d,false,ds,arr));
+        const arr=data[ds]||[], adm=admins[ds]||[];
+        row.appendChild(makeCell(d,false,ds,arr,adm));
       }
       while(row.children.length<7)row.appendChild(makeCell(''));
       calBody.appendChild(row);updateSelectionUI();
     }
 
-    function makeCell(day,disabled=false,ds='',arr=[]){
-      const adminArr=getAdminAdds()[ds]||[];
-      const merged=arr.concat(adminArr);
+    function makeCell(day,disabled=false,ds='',arr=[],adm=[]){
+      const merged=arr.concat(adm);
       const td=document.createElement('td');
       td.className=disabled?'disabled p-2':'p-2';
       if(!disabled&&day){
@@ -180,11 +183,11 @@
     function isConsecutive(d){const a=Array.from(new Set(d.map(x=>new Date(x).setHours(0,0,0,0)))).sort((a,b)=>a-b);let r=1;for(let i=1;i<a.length;i++){if(a[i]-a[i-1]===86400000){r++;if(r>3)return false;}else r=1;}return true;}
 
     function toggleSelect(ds){
-      const i=selected.indexOf(ds),data=getData(),adminAdds=getAdminAdds();
+      const i=selected.indexOf(ds),data=getData(),admins=getAdminAdds();
       const existDates=Object.entries(data).filter(([date,arr])=>{
         if(!date.startsWith(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`))return false;
-        const admins=adminAdds[date]||[];
-        return arr.includes(currentUser)||admins.includes(currentUser);
+        const adm=admins[date]||[];
+        return arr.includes(currentUser)||adm.includes(currentUser);
       }).map(([d])=>d);
       let temp=i>=0?selected.filter(x=>x!==ds):[...selected,ds];
       if(!isConsecutive(existDates.concat(temp))){alert('연속 신청은 최대 3일까지만 가능합니다.');return;}
@@ -194,7 +197,35 @@
 
     function updateSelectionUI(){document.querySelectorAll('#calendar td').forEach(td=>td.classList.remove('bg-blue-200'));selected.forEach(ds=>{document.querySelectorAll('#calendar td').forEach(td=>{if(td.innerText.startsWith(String(Number(ds.slice(-2)))))td.classList.add('bg-blue-200');});});selDatesEl.textContent=selected.join(', ')||'없음';selCountEl.textContent=selected.length;applyBtn.disabled=selected.length===0;}
 
-    function renderMyList(){myList.innerHTML='';const data=getData();Object.keys(data).filter(d=>data[d].includes(currentUser)).sort().forEach(date=>{const li=document.createElement('li');li.className='flex justify-between items-center';li.innerHTML=`<span>${date}</span><button class="text-red-500">X</button>`;li.querySelector('button').onclick=()=>{if(!confirm('취소할까요?'))return;data[date]=data[date].filter(n=>n!==currentUser);if(!data[date].length)delete data[date];saveData(data);renderCalendar();renderMyList();};myList.appendChild(li);});}
+    function renderMyList(){
+      myList.innerHTML='';
+      const data=getData(),admins=getAdminAdds();
+      // combine dates where currentUser is in data or admins
+      const dates = new Set([
+        ...Object.keys(data).filter(d=>data[d].includes(currentUser)),
+        ...Object.keys(admins).filter(d=>admins[d].includes(currentUser))
+      ]);
+      Array.from(dates).sort().forEach(date=>{
+        const isAdmin = (admins[date]||[]).includes(currentUser);
+        const li = document.createElement('li');
+        li.className='flex justify-between items-center';
+        li.innerHTML = `<span>${date} ${isAdmin?'<span class="ml-2">👑</span>':''}</span><button class="text-red-500">X</button>`;
+        li.querySelector('button').onclick=()=>{
+          if(!confirm('취소할까요?')) return;
+          if(isAdmin) {
+            admins[date] = admins[date].filter(n=>n!==currentUser);
+            if(!admins[date].length) delete admins[date];
+            saveAdminAdds(admins);
+          } else {
+            data[date] = data[date].filter(n=>n!==currentUser);
+            if(!data[date].length) delete data[date];
+            saveData(data);
+          }
+          renderCalendar(); renderMyList();
+        };
+        myList.appendChild(li);
+      });
+    }
 
     ['click','keydown','mousemove'].forEach(evt=>document.addEventListener(evt,updateActivity));
     if(currentUser){updateActivity();showApp();}else showAuth();

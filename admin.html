@@ -41,12 +41,36 @@
       </table>
     </div>
 
-    <!-- 우측: 상세 + NICU 목록 -->
+    <!-- 우측: 기간 설정, 상세, NICU 목록 -->
     <div class="space-y-6">
+      <!-- 신청 기간 설정 -->
+      <div id="periodControl" class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">신청 기간 설정</h2>
+        <form id="periodForm" class="space-y-2">
+          <div class="flex items-center space-x-2">
+            <label for="periodMonth" class="w-20">대상 월</label>
+            <input type="month" id="periodMonth" class="border rounded px-2 py-1 flex-1"/>
+          </div>
+          <div class="flex items-center space-x-2">
+            <label for="periodStart" class="w-20">시작</label>
+            <input type="datetime-local" id="periodStart" class="border rounded px-2 py-1 flex-1"/>
+          </div>
+          <div class="flex items-center space-x-2">
+            <label for="periodEnd" class="w-20">종료</label>
+            <input type="datetime-local" id="periodEnd" class="border rounded px-2 py-1 flex-1"/>
+          </div>
+          <button type="submit" class="btn-admin">저장</button>
+        </form>
+        <ul id="periodList" class="mt-4 space-y-1 text-sm text-gray-700"></ul>
+      </div>
+
+      <!-- 날짜별 신청자 상세 -->
       <div id="details" class="bg-white p-4 rounded-lg shadow">
         <h2 id="detailDate" class="text-xl font-semibold mb-2">날짜 선택</h2>
         <ul id="detailList" class="space-y-2"></ul>
       </div>
+
+      <!-- NICU (화이트리스트) -->
       <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-2">NICU</h2>
         <ul id="whitelist" class="grid grid-cols-3 gap-2"></ul>
@@ -56,12 +80,24 @@
 
   <script>
   window.addEventListener('DOMContentLoaded', () => {
+    // LocalStorage helpers
     const getData       = () => JSON.parse(localStorage.getItem('app_data')      || '{}');
     const saveData      = d => localStorage.setItem('app_data',      JSON.stringify(d));
     const getAdminAdds  = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
     const saveAdminAdds = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
-    const allowedNames  = ["천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수","전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영","박희연","원유미","인휘"];
+    const getPeriods    = () => JSON.parse(localStorage.getItem('app_periods')  || '{}');
+    const savePeriods   = p => localStorage.setItem('app_periods', JSON.stringify(p));
 
+    // Whitelist names
+    const allowedNames = [
+      "천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수",
+      "전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수",
+      "서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령",
+      "김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영",
+      "박희연","원유미","인휘"
+    ];
+
+    // DOM refs
     const adminCal    = document.getElementById('adminCalendar');
     const detailDate  = document.getElementById('detailDate');
     const detailList  = document.getElementById('detailList');
@@ -70,21 +106,61 @@
     const prevMonth   = document.getElementById('prevMonth');
     const nextMonth   = document.getElementById('nextMonth');
     const monthLabel  = document.getElementById('monthLabel');
+    const periodForm  = document.getElementById('periodForm');
+    const periodList  = document.getElementById('periodList');
+    const monthInput  = document.getElementById('periodMonth');
+    const startInput  = document.getElementById('periodStart');
+    const endInput    = document.getElementById('periodEnd');
 
     let cur = new Date(), selectedDate = '';
 
+    // Auth redirect
     logoutBtn.onclick = () => {
       localStorage.removeItem('app_current');
       location.href = 'index.html';
     };
+
+    // Month nav
     prevMonth.onclick = () => { cur.setMonth(cur.getMonth() - 1); renderCalendar(); };
     nextMonth.onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCalendar(); };
 
+    // Handle period form
+    function renderPeriods() {
+      const periods = getPeriods();
+      periodList.innerHTML = '';
+      Object.entries(periods).sort().forEach(([ym, {start,end}]) => {
+        const li = document.createElement('li');
+        li.textContent = `${ym}: ${new Date(start).toLocaleString()} ~ ${new Date(end).toLocaleString()}`;
+        periodList.appendChild(li);
+      });
+    }
+    periodForm.onsubmit = e => {
+      e.preventDefault();
+      const ym = monthInput.value;
+      const start = startInput.value;
+      const end = endInput.value;
+      if (!ym || !start || !end) return alert('모든 값을 입력하세요.');
+      const periods = getPeriods();
+      periods[ym] = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+      savePeriods(periods);
+      renderPeriods();
+      alert('신청 기간이 저장되었습니다.');
+    };
+
+    // Check if date is within open period
+    function isWithinPeriod(dateStr) {
+      const periods = getPeriods();
+      const ym = dateStr.slice(0,7);
+      if (!periods[ym]) return false;
+      const t = new Date().toISOString();
+      return t >= periods[ym].start && t <= periods[ym].end;
+    }
+
+    // Calendar rendering
     function renderCalendar() {
       adminCal.innerHTML = '';
       const year  = cur.getFullYear(), month = cur.getMonth();
       monthLabel.textContent = `${year}년 ${month+1}월`;
-
       const first = new Date(year, month, 1).getDay();
       const days  = new Date(year, month+1, 0).getDate();
       let row = document.createElement('tr');
@@ -94,10 +170,10 @@
       const adminAdds = getAdminAdds();
 
       for (let d=1; d<=days; d++) {
-        if ((first + d - 1)%7===0 && d!==1) { adminCal.appendChild(row); row=document.createElement('tr'); }
+        if ((first+d-1)%7===0 && d!==1) { adminCal.appendChild(row); row=document.createElement('tr'); }
         const ds    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const users = data[ds]     || [];
-        const adds  = adminAdds[ds]|| [];
+        const users = data[ds]      || [];
+        const adds  = adminAdds[ds] || [];
         const names = users.concat(adds.map(n=>'👑 '+n));
 
         const td = document.createElement('td');
@@ -107,10 +183,11 @@
         td.onclick = () => showDetails(ds);
         row.appendChild(td);
       }
-      while(row.children.length<7) row.appendChild(document.createElement('td'));
+      while (row.children.length<7) row.appendChild(document.createElement('td'));
       adminCal.appendChild(row);
     }
 
+    // Detail + NICU list
     function showDetails(date) {
       selectedDate = date;
       detailDate.textContent = `예약자 목록 — ${date}`;
@@ -118,52 +195,72 @@
 
       const data      = getData();
       const adminAdds = getAdminAdds();
-      const users     = data[date]     || [];
-      const adds      = adminAdds[date]|| [];
+      const users     = data[date] || [];
+      const adds      = adminAdds[date] || [];
 
-      users.forEach((name,i)=>{
+      users.forEach((name,i) => {
         const li = document.createElement('li');
-        li.className='flex justify-between items-center';
-        li.innerHTML=`<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick=()=>{
-          if(!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
-          const u = users.filter(n=>n!==name);
-          if(u.length) data[date]=u; else delete data[date];
-          saveData(data); renderCalendar(); showDetails(date);
+        li.className = 'flex justify-between items-center';
+        li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = () => {
+          if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
+          const updated = users.filter(n=>n!==name);
+          if (updated.length) data[date]=updated; else delete data[date];
+          saveData(data);
+          renderCalendar(); showDetails(date);
         };
         detailList.appendChild(li);
       });
 
-      adds.forEach((name,i)=>{
+      adds.forEach((name,i) => {
         const li = document.createElement('li');
-        li.className='flex justify-between items-center admin-added';
-        li.innerHTML=`<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
-        li.querySelector('button').onclick=()=>{
-          if(!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
-          const a = adds.filter(n=>n!==name);
-          if(a.length) adminAdds[date]=a; else delete adminAdds[date];
-          saveAdminAdds(adminAdds); renderCalendar(); showDetails(date);
+        li.className = 'flex justify-between items-center admin-added';
+        li.innerHTML = `<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = () => {
+          if (!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
+          const updated = adds.filter(n=>n!==name);
+          if (updated.length) adminAdds[date]=updated; else delete adminAdds[date];
+          saveAdminAdds(adminAdds);
+          renderCalendar(); showDetails(date);
         };
         detailList.appendChild(li);
       });
 
-      if(users.length===0&&adds.length===0) detailList.textContent='예약자가 없습니다.';
+      if (users.length===0 && adds.length===0) {
+        detailList.textContent = '예약자가 없습니다.';
+      }
 
-      whitelist.innerHTML='';
-      const namesList=[...allowedNames].sort((a,b)=>a.localeCompare(b,'ko'));
-      namesList.forEach(name=>{
-        const li=document.createElement('li');
-        li.className='flex justify-center';
-        const btn=document.createElement('button');
-        btn.textContent=name; btn.className='btn-admin w-full';
-        const already=users.includes(name)||adds.includes(name);
-        const totalCnt=users.length+adds.length;
-        if(already||totalCnt>=3){ btn.disabled=true; btn.classList.add('disabled'); }
-        else btn.onclick=()=>{ adminAdds[date]=[...(adminAdds[date]||[]),name]; saveAdminAdds(adminAdds); renderCalendar(); showDetails(date); };
-        li.appendChild(btn); whitelist.appendChild(li);
+      whitelist.innerHTML = '';
+      const namesList = [...allowedNames].sort((a,b)=>a.localeCompare(b,'ko'));
+      namesList.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-center';
+        const btn = document.createElement('button');
+        btn.textContent = name;
+        btn.className = 'btn-admin w-full';
+        const allCount = users.length + adds.length;
+        const already = users.includes(name) || adds.includes(name);
+        if (already || allCount >= 3) {
+          btn.disabled = true;
+          btn.classList.add('disabled');
+        } else {
+          btn.onclick = () => {
+            if (!isWithinPeriod(date)) {
+              alert('신청 기간이 아닙니다.');
+              return;
+            }
+            adminAdds[date] = [...adds, name];
+            saveAdminAdds(adminAdds);
+            renderCalendar(); showDetails(date);
+          };
+        }
+        li.appendChild(btn);
+        whitelist.appendChild(li);
       });
     }
 
+    // Init
+    renderPeriods();
     renderCalendar();
   });
   </script>

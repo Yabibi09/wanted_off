@@ -121,6 +121,8 @@
     const saveUsers=u=>localStorage.setItem('app_users',JSON.stringify(u));
     const getData = ()=>JSON.parse(localStorage.getItem('app_data')||'{}');
     const saveData = d=>localStorage.setItem('app_data',JSON.stringify(d));
+    const getAdminAdds  = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
+    const saveAdminAdds = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
     const updateActivity=()=>localStorage.setItem('lastActivity',Date.now());
 
     function startTimer(){

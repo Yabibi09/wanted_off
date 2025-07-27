@@ -25,21 +25,23 @@
     <div class="lg:col-span-2 overflow-x-auto">
       <table class="w-full bg-white rounded-lg shadow text-center">
         <thead class="bg-indigo-100">
-          <tr><th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
+          <tr>
+            <th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
+          </tr>
         </thead>
         <tbody id="adminCalendar" class="divide-y"></tbody>
       </table>
     </div>
 
-    <!-- 우측: 상세 + 화이트리스트 -->
+    <!-- 우측: 상세 + NICU 목록 -->
     <div class="space-y-6">
       <div id="details" class="bg-white p-4 rounded-lg shadow">
         <h2 id="detailDate" class="text-xl font-semibold mb-2">날짜 선택</h2>
         <ul id="detailList" class="space-y-2"></ul>
       </div>
       <div class="bg-white p-4 rounded-lg shadow">
-        <h2 class="text-xl font-semibold mb-2">화이트리스트</h2>
-        <ul id="whitelist" class="space-y-2"></ul>
+        <h2 class="text-xl font-semibold mb-2">NICU</h2>
+        <ul id="whitelist" class="grid grid-cols-3 gap-2"></ul>
       </div>
     </div>
   </div>
@@ -79,23 +81,24 @@
       const adminAdds = getAdminAdds();
 
       for (let d=1; d<=days; d++) {
-        if ((first+d-1)%7===0 && d!==1) {
+        if ((first + d - 1) % 7 === 0 && d !== 1) {
           adminCal.appendChild(row);
           row = document.createElement('tr');
         }
-        const ds     = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const users  = data[ds]      || [];
-        const adds   = adminAdds[ds] || [];
-        const names  = users.concat(adds.map(n=>n+' (관리자)'));
+        const ds    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const users = data[ds]      || [];
+        const adds  = adminAdds[ds] || [];
+        const names = users.concat(adds.map(n => `👑 ${n}`));
 
         const td = document.createElement('td');
-        td.className = names.length>0 ? 'cell-booked p-2' : 'cell-open p-2';
+        td.className = names.length > 0 ? 'cell-booked p-2' : 'cell-open p-2';
         td.innerHTML = `<div class="font-semibold mb-1">${d}</div>` +
                        names.map(n=>`<div class="text-sm">${n}</div>`).join('');
         td.onclick = () => showDetails(ds);
         row.appendChild(td);
       }
-      while (row.children.length<7) row.appendChild(document.createElement('td'));
+
+      while (row.children.length < 7) row.appendChild(document.createElement('td'));
       adminCal.appendChild(row);
     }
 
@@ -116,9 +119,8 @@
         li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
         li.querySelector('button').onclick = () => {
           if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
-          const updated = users.filter(n=>n!==name);
-          if (updated.length) data[date] = updated;
-          else delete data[date];
+          const updated = users.filter(n => n !== name);
+          if (updated.length) data[date] = updated; else delete data[date];
           saveData(data);
           renderCalendar(); showDetails(date);
         };
@@ -129,37 +131,38 @@
       adds.forEach((name, i) => {
         const li = document.createElement('li');
         li.className = 'flex justify-between items-center admin-added';
-        li.innerHTML = `<span>${users.length+i+1}. ${name}</span><button class="text-red-500">취소</button>`;
+        li.innerHTML = `<span>${users.length+i+1}. 👑 ${name}</span><button class="text-red-500">취소</button>`;
         li.querySelector('button').onclick = () => {
-          if (!confirm(`${name} 관리자 추가를 취소하시겠습니까?`)) return;
-          const updated = adds.filter(n=>n!==name);
-          if (updated.length) adminAdds[date] = updated;
-          else delete adminAdds[date];
+          if (!confirm(`${name} 관리자 예약을 취소하시겠습니까?`)) return;
+          const updated = adds.filter(n => n !== name);
+          if (updated.length) adminAdds[date] = updated; else delete adminAdds[date];
           saveAdminAdds(adminAdds);
           renderCalendar(); showDetails(date);
         };
         detailList.appendChild(li);
       });
 
-      if (users.length===0 && adds.length===0) {
+      if (users.length === 0 && adds.length === 0) {
         detailList.textContent = '예약자가 없습니다.';
       }
 
-      // 화이트리스트 출력
+      // NICU 목록 (가나다순, 3열)
       whitelist.innerHTML = '';
-      allowedNames.forEach(name => {
+      const namesList = [...allowedNames].sort((a, b) => a.localeCompare(b, 'ko'));
+      namesList.forEach(name => {
         const li = document.createElement('li');
-        li.className = 'flex justify-between items-center';
+        li.className = 'flex justify-center';
         const btn = document.createElement('button');
         btn.textContent = name;
-        btn.className = 'btn-admin';
-        const already = users.concat(adds).includes(name);
-        if (already || users.length+adds.length>=3) {
+        btn.className = 'btn-admin w-full';
+        const allCount = users.length + adds.length;
+        const already = users.includes(name) || adds.includes(name);
+        if (already || allCount >= 3) {
           btn.disabled = true;
           btn.classList.add('disabled');
         } else {
           btn.onclick = () => {
-            adminAdds[date] = (adminAdds[date]||[]).concat(name);
+            adminAdds[date] = (adminAdds[date] || []).concat(name);
             saveAdminAdds(adminAdds);
             renderCalendar(); showDetails(date);
           };

@@ -6,14 +6,13 @@
   <title>관리자 모드 - NICU wanted off</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* 관리자 버튼 스타일 */
     .btn-admin {
       @apply px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition;
     }
     .cell-booked { @apply bg-red-100; }
     .cell-open   { @apply bg-green-100 cursor-pointer hover:bg-green-200; }
-    /* 관리자 추가 예약 강조 */
     .admin-added { @apply font-bold bg-yellow-200; }
+    .disabled    { @apply opacity-50 cursor-not-allowed; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen p-6">
@@ -21,89 +20,85 @@
   <h1 class="text-3xl font-bold mb-6">⚙️ 관리자 모드</h1>
   <button id="logoutAdmin" class="btn-admin mb-4">로그아웃</button>
 
-  <!-- 달력 전체 보기 -->
-  <div class="overflow-x-auto mb-6">
-    <table class="w-full bg-white rounded-lg shadow text-center">
-      <thead class="bg-indigo-100">
-        <tr>
-          <th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
-        </tr>
-      </thead>
-      <tbody id="adminCalendar" class="divide-y"></tbody>
-    </table>
-  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 달력 영역 -->
+    <div class="lg:col-span-2 overflow-x-auto">
+      <table class="w-full bg-white rounded-lg shadow text-center">
+        <thead class="bg-indigo-100">
+          <tr><th class="p-2">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
+        </thead>
+        <tbody id="adminCalendar" class="divide-y"></tbody>
+      </table>
+    </div>
 
-  <!-- 날짜별 예약자 리스트 -->
-  <div id="details" class="bg-white p-4 rounded-lg shadow max-w-lg mx-auto">
-    <h2 id="detailDate" class="text-xl font-semibold mb-2">날짜 선택</h2>
-    <ul id="detailList" class="space-y-2 mb-4"></ul>
-    <button id="addDummy" class="btn-admin">임의 추가</button>
+    <!-- 우측: 상세 + 화이트리스트 -->
+    <div class="space-y-6">
+      <div id="details" class="bg-white p-4 rounded-lg shadow">
+        <h2 id="detailDate" class="text-xl font-semibold mb-2">날짜 선택</h2>
+        <ul id="detailList" class="space-y-2"></ul>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">화이트리스트</h2>
+        <ul id="whitelist" class="space-y-2"></ul>
+      </div>
+    </div>
   </div>
 
   <script>
   window.addEventListener('DOMContentLoaded', () => {
-    // 로컬스토리지 접근 함수
     const getData       = () => JSON.parse(localStorage.getItem('app_data')      || '{}');
     const saveData      = d => localStorage.setItem('app_data',      JSON.stringify(d));
     const getAdminAdds  = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
     const saveAdminAdds = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
+    const allowedNames  = ["천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수","전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영","박희연","원유미","인휘"];
 
     const adminCal   = document.getElementById('adminCalendar');
     const detailDate = document.getElementById('detailDate');
     const detailList = document.getElementById('detailList');
-    const addDummy   = document.getElementById('addDummy');
+    const whitelist  = document.getElementById('whitelist');
     const logoutBtn  = document.getElementById('logoutAdmin');
 
     let cur = new Date(), selectedDate = '';
 
-    // 로그아웃
     logoutBtn.onclick = () => {
       localStorage.removeItem('app_current');
       location.href = 'index.html';
     };
 
-    // 달력 렌더
     function renderCalendar() {
       adminCal.innerHTML = '';
-      const year    = cur.getFullYear(),
-            month   = cur.getMonth(),
-            first   = new Date(year, month, 1).getDay(),
-            days    = new Date(year, month+1, 0).getDate();
+      const year  = cur.getFullYear(),
+            month = cur.getMonth(),
+            first = new Date(year, month, 1).getDay(),
+            days  = new Date(year, month+1, 0).getDate();
       let row = document.createElement('tr');
 
-      // 빈 칸
-      for (let i = 0; i < first; i++) {
-        row.appendChild(document.createElement('td'));
-      }
+      for (let i=0; i<first; i++) row.appendChild(document.createElement('td'));
 
       const data      = getData();
       const adminAdds = getAdminAdds();
 
-      for (let d = 1; d <= days; d++) {
-        if ((first + d - 1) % 7 === 0 && d !== 1) {
+      for (let d=1; d<=days; d++) {
+        if ((first+d-1)%7===0 && d!==1) {
           adminCal.appendChild(row);
           row = document.createElement('tr');
         }
         const ds     = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const users  = data[ds]       || [];
-        const adds   = adminAdds[ds]  || [];
-        const total  = users.length + adds.length;
+        const users  = data[ds]      || [];
+        const adds   = adminAdds[ds] || [];
+        const names  = users.concat(adds.map(n=>n+' (관리자)'));
 
         const td = document.createElement('td');
-        td.className = total > 0 ? 'cell-booked p-2' : 'cell-open p-2';
-        td.textContent = d + (total>0 ? ` (${total})` : '');
+        td.className = names.length>0 ? 'cell-booked p-2' : 'cell-open p-2';
+        td.innerHTML = `<div class="font-semibold mb-1">${d}</div>` +
+                       names.map(n=>`<div class="text-sm">${n}</div>`).join('');
         td.onclick = () => showDetails(ds);
-
         row.appendChild(td);
       }
-
-      while (row.children.length < 7) {
-        row.appendChild(document.createElement('td'));
-      }
+      while (row.children.length<7) row.appendChild(document.createElement('td'));
       adminCal.appendChild(row);
     }
 
-    // 날짜별 상세 표시
     function showDetails(date) {
       selectedDate = date;
       detailDate.textContent = `예약자 목록 — ${date}`;
@@ -112,72 +107,68 @@
       const data      = getData();
       const adminAdds = getAdminAdds();
       const users     = data[date]      || [];
-      const admins    = adminAdds[date] || [];
+      const adds      = adminAdds[date] || [];
 
-      // 일반 사용자 예약
-      if (users.length > 0) {
-        users.forEach((name, i) => {
-          const li = document.createElement('li');
-          li.className = 'flex justify-between items-center';
-          li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
-          li.querySelector('button').onclick = () => {
-            if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
-            const updated = users.filter(n => n !== name);
-            if (updated.length) data[date] = updated;
-            else delete data[date];
-            saveData(data);
-            renderCalendar();
-            showDetails(date);
-          };
-          detailList.appendChild(li);
-        });
-      }
+      // 사용자 예약
+      users.forEach((name, i) => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between items-center';
+        li.innerHTML = `<span>${i+1}. ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = () => {
+          if (!confirm(`${name} 예약을 취소하시겠습니까?`)) return;
+          const updated = users.filter(n=>n!==name);
+          if (updated.length) data[date] = updated;
+          else delete data[date];
+          saveData(data);
+          renderCalendar(); showDetails(date);
+        };
+        detailList.appendChild(li);
+      });
 
-      // 관리자 추가 예약 (강조)
-      if (admins.length > 0) {
-        admins.forEach((name, i) => {
-          const li = document.createElement('li');
-          li.className = 'flex justify-between items-center admin-added';
-          li.innerHTML = `<span>${users.length + i + 1}. ${name} (관리자 추가)</span><button class="text-red-500">취소</button>`;
-          li.querySelector('button').onclick = () => {
-            if (!confirm(`${name} 관리자 추가를 취소하시겠습니까?`)) return;
-            const updatedAdmin = admins.filter(n => n !== name);
-            if (updatedAdmin.length) adminAdds[date] = updatedAdmin;
-            else delete adminAdds[date];
-            saveAdminAdds(adminAdds);
-            renderCalendar();
-            showDetails(date);
-          };
-          detailList.appendChild(li);
-        });
-      }
+      // 관리자 추가 예약
+      adds.forEach((name, i) => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between items-center admin-added';
+        li.innerHTML = `<span>${users.length+i+1}. ${name}</span><button class="text-red-500">취소</button>`;
+        li.querySelector('button').onclick = () => {
+          if (!confirm(`${name} 관리자 추가를 취소하시겠습니까?`)) return;
+          const updated = adds.filter(n=>n!==name);
+          if (updated.length) adminAdds[date] = updated;
+          else delete adminAdds[date];
+          saveAdminAdds(adminAdds);
+          renderCalendar(); showDetails(date);
+        };
+        detailList.appendChild(li);
+      });
 
-      // 예약자 없을 때
-      if (users.length === 0 && admins.length === 0) {
+      if (users.length===0 && adds.length===0) {
         detailList.textContent = '예약자가 없습니다.';
       }
+
+      // 화이트리스트 출력
+      whitelist.innerHTML = '';
+      allowedNames.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between items-center';
+        const btn = document.createElement('button');
+        btn.textContent = name;
+        btn.className = 'btn-admin';
+        const already = users.concat(adds).includes(name);
+        if (already || users.length+adds.length>=3) {
+          btn.disabled = true;
+          btn.classList.add('disabled');
+        } else {
+          btn.onclick = () => {
+            adminAdds[date] = (adminAdds[date]||[]).concat(name);
+            saveAdminAdds(adminAdds);
+            renderCalendar(); showDetails(date);
+          };
+        }
+        li.appendChild(btn);
+        whitelist.appendChild(li);
+      });
     }
 
-    // 관리자 임의 추가
-    addDummy.onclick = () => {
-      if (!selectedDate) { alert('날짜를 먼저 선택하세요.'); return; }
-      const name = prompt('추가할 이름을 입력하세요:');
-      if (!name) return;
-      const data      = getData();
-      const adminAdds = getAdminAdds();
-      const users     = data[selectedDate]     || [];
-      const admins    = adminAdds[selectedDate]|| [];
-      if (users.length + admins.length >= 3) {
-        alert('하루 최대 3명입니다.');
-        return;
-      }
-      adminAdds[selectedDate] = [...admins, name];
-      saveAdminAdds(adminAdds);
-      renderCalendar();
-      showDetails(selectedDate);
-    };
-
-    // 초기 렌더
     renderCalendar();
   });
   </script>

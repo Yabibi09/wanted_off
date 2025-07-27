@@ -8,10 +8,9 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
   <div class="max-w-4xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-4 gap-4">
-    <!-- 좌측: 인증 & 달력 -->
+    <!-- 인증 & 달력 -->
     <div class="lg:col-span-3 space-y-6">
       <h1 class="text-3xl font-bold text-center">❤️ NICU wanted off ❤️</h1>
-      <!-- 인증 -->
       <div id="auth" class="space-y-4">
         <div class="flex justify-center gap-4">
           <button id="showLogin" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow">로그인</button>
@@ -30,13 +29,12 @@
           <button type="submit" class="w-full py-2 bg-green-600 text-white rounded-lg">회원가입</button>
         </form>
       </div>
-      <!-- 달력 & 신청 -->
+      <!-- 사용자 달력 & 신청 -->
       <div id="app" class="hidden space-y-4">
         <div class="flex justify-between items-center">
           <span id="welcome" class="text-lg font-medium"></span>
           <button id="logout" class="px-3 py-1 bg-red-500 text-white rounded-lg shadow">로그아웃</button>
         </div>
-        <!-- 타이머 표시 -->
         <div class="text-right text-sm text-gray-600">
           남은 시간: <span id="timer">--:--</span>
         </div>
@@ -59,25 +57,30 @@
         </div>
       </div>
     </div>
-    <!-- 우측: 신청내역 -->
+    <!-- 신청내역 (현재 보고 있는 월만) -->
     <div id="history" class="space-y-4 hidden">
       <h2 class="text-xl font-semibold">신청내역</h2>
       <ul id="myList" class="bg-white p-4 rounded-lg shadow space-y-2"></ul>
     </div>
   </div>
+
   <script>
   window.addEventListener('DOMContentLoaded', () => {
     const INACTIVITY_LIMIT = 10*60*1000;
-    const allowedNames = ["admin","천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수","전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영","박희연","원유미","인휘"];
+    const allowedNames = ["admin","천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수",
+      "전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수","서영서","홍수아","박주현",
+      "엄나혜","이수지","정혜아","이시은","백지연","허자령","김수민","이다경","신옥비","박인희","신주영","최은방",
+      "길용순","한은진","심나영","박희연","원유미","인휘"];
 
     // Storage helpers
-    const getUsers       = () => JSON.parse(localStorage.getItem('app_users')   || '[]');
-    const saveUsers      = u => localStorage.setItem('app_users', JSON.stringify(u));
-    const getData        = () => JSON.parse(localStorage.getItem('app_data')    || '{}');
-    const saveData       = d => localStorage.setItem('app_data', JSON.stringify(d));
-    const getAdminAdds   = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
-    const saveAdminAdds  = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
-    const updateActivity = () => localStorage.setItem('lastActivity', Date.now());
+    const getUsers      = () => JSON.parse(localStorage.getItem('app_users')   || '[]');
+    const saveUsers     = u => localStorage.setItem('app_users', JSON.stringify(u));
+    const getData       = () => JSON.parse(localStorage.getItem('app_data')    || '{}');
+    const saveData      = d => localStorage.setItem('app_data', JSON.stringify(d));
+    const getAdminAdds  = () => JSON.parse(localStorage.getItem('app_adminAdds')|| '{}');
+    const saveAdminAdds = d => localStorage.setItem('app_adminAdds', JSON.stringify(d));
+    const getPeriods    = () => JSON.parse(localStorage.getItem('app_periods')  || '{}');
+    const updateActivity= () => localStorage.setItem('lastActivity', Date.now());
 
     // DOM refs
     const authDiv      = document.getElementById('auth'),
@@ -92,143 +95,235 @@
           selDatesEl   = document.getElementById('selectedDates'),
           selCountEl   = document.getElementById('selCount'),
           applyBtn     = document.getElementById('applyBtn'),
-          myList       = document.getElementById('myList');
+          myList       = document.getElementById('myList'),
+          prevBtn      = document.getElementById('prev'),
+          nextBtn      = document.getElementById('next');
 
     let currentUser = localStorage.getItem('app_current')||'';
-    let cur=new Date(), selected=[]; let timerInterval;
+    let cur = new Date(), selected = [], timerInterval;
 
+    // Timer & inactivity
     function startTimer(){
-      function upd(){
-        const last=+localStorage.getItem('lastActivity')||0;
-        const diff=INACTIVITY_LIMIT-(Date.now()-last);
-        if(diff<=0){alert('자동 로그아웃 됩니다.');logout();return;}
-        const m=String(Math.floor(diff/60000)).padStart(2,'0'),
-              s=String(Math.floor((diff%60000)/1000)).padStart(2,'0');
-        timerEl.textContent=`${m}:${s}`;
+      function tick(){
+        const last = +localStorage.getItem('lastActivity')||0;
+        const diff = INACTIVITY_LIMIT - (Date.now()-last);
+        if(diff<=0){ alert('자동 로그아웃 됩니다.'); logout(); return; }
+        const m = String(Math.floor(diff/60000)).padStart(2,'0'),
+              s = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+        timerEl.textContent = `${m}:${s}`;
       }
-      upd();return setInterval(upd,1000);
+      tick(); return setInterval(tick,1000);
     }
-    function showAuth(){authDiv.classList.remove('hidden');appDiv.classList.add('hidden');historyDiv.classList.add('hidden');clearInterval(timerInterval);}
-    function showApp(){if(!currentUser)return showAuth();authDiv.classList.add('hidden');appDiv.classList.remove('hidden');historyDiv.classList.remove('hidden');welcome.textContent=`${currentUser} 선생님 🐥`;updateActivity();timerInterval=startTimer();renderCalendar();renderMyList();updateSelectionUI();}
 
-    function login(name){if(name==='admin')return window.location.href='admin.html';currentUser=name;localStorage.setItem('app_current',name);showApp();}
-    function logout(){localStorage.removeItem('app_current');currentUser='';showAuth();}
+    // Auth UIs
+    function showAuth(){
+      authDiv.classList.remove('hidden');
+      appDiv.classList.add('hidden');
+      historyDiv.classList.add('hidden');
+      clearInterval(timerInterval);
+    }
+    function showApp(){
+      if(!currentUser) return showAuth();
+      authDiv.classList.add('hidden');
+      appDiv.classList.remove('hidden');
+      historyDiv.classList.remove('hidden');
+      welcome.textContent = `${currentUser} 선생님 🐥`;
+      updateActivity();
+      timerInterval = startTimer();
+      renderCalendar();
+      renderMyList();
+      updateSelectionUI();
+    }
 
-    formRegister.onsubmit=e=>{e.preventDefault();const n=document.getElementById('regName').value.trim(),p=document.getElementById('regPw').value;if(!allowedNames.includes(n)){alert('허용된 이름이 아닙니다.');return;}let u=getUsers();if(u.find(x=>x.name===n)){alert('이미 존재');return;}u.push({name:n,pw:p});saveUsers(u);alert('가입 완료');formRegister.classList.add('hidden');formLogin.classList.remove('hidden');};
-    formLogin.onsubmit=e=>{e.preventDefault();const n=document.getElementById('loginName').value.trim(),p=document.getElementById('loginPw').value;const u=getUsers().find(x=>x.name===n&&x.pw===p);if(!u){alert('로그인 실패');return;}login(n);};
-    document.getElementById('showLogin').onclick=()=>{formLogin.classList.remove('hidden');formRegister.classList.add('hidden');showAuth();};
-    document.getElementById('showRegister').onclick=()=>{formRegister.classList.remove('hidden');formLogin.classList.add('hidden');showAuth();};
-    document.getElementById('logout').onclick=logout;
-    document.getElementById('prev').onclick=()=>{cur.setMonth(cur.getMonth()-1);renderCalendar();};
-    document.getElementById('next').onclick=()=>{cur.setMonth(cur.getMonth()+1);renderCalendar();};
+    function login(name){
+      if(name==='admin') return window.location.href='admin.html';
+      currentUser = name;
+      localStorage.setItem('app_current', name);
+      showApp();
+    }
+    function logout(){
+      localStorage.removeItem('app_current');
+      currentUser = '';
+      showAuth();
+    }
+
+    // Period check
+    function isWithinPeriod(dateStr){
+      const periods = getPeriods();
+      const ym = dateStr.slice(0,7);
+      if(!periods[ym]) return false;        // 설정 없는 월은 무조건 불가
+      const now = new Date().toISOString();
+      return now >= periods[ym].start && now <= periods[ym].end;
+    }
+
+    // Handlers
+    formRegister.onsubmit = e => {
+      e.preventDefault();
+      const n = document.getElementById('regName').value.trim();
+      const p = document.getElementById('regPw').value;
+      if(!allowedNames.includes(n)){ alert('허용된 이름이 아닙니다.'); return; }
+      let users = getUsers();
+      if(users.find(u=>u.name===n)){ alert('이미 존재'); return; }
+      users.push({name:n,pw:p});
+      saveUsers(users);
+      alert('가입 완료');
+      formRegister.classList.add('hidden');
+      formLogin.classList.remove('hidden');
+    };
+    formLogin.onsubmit = e => {
+      e.preventDefault();
+      const n = document.getElementById('loginName').value.trim();
+      const p = document.getElementById('loginPw').value;
+      const u = getUsers().find(u=>u.name===n&&u.pw===p);
+      if(!u){ alert('로그인 실패'); return; }
+      login(n);
+    };
+    document.getElementById('showLogin').onclick    = ()=>{ formLogin.classList.remove('hidden'); formRegister.classList.add('hidden'); showAuth(); };
+    document.getElementById('showRegister').onclick = ()=>{ formRegister.classList.remove('hidden'); formLogin.classList.add('hidden'); showAuth(); };
+    document.getElementById('logout').onclick       = logout;
+    prevBtn.onclick = ()=>{ cur.setMonth(cur.getMonth()-1); renderCalendar(); };
+    nextBtn.onclick = ()=>{ cur.setMonth(cur.getMonth()+1); renderCalendar(); };
     applyBtn.onclick=()=>applySelected();
 
-    // 한 달 누적 신청 일수 계산 (관리자 예약 포함)
-    function countThisMonth(user,data,yy,mm){
-      const adminAdds=getAdminAdds();
+    // 한 달 누적 계산 (관리자 추가 포함)
+    function countThisMonth(user, data){
+      const admins = getAdminAdds();
+      const ym = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
       return Object.entries(data).filter(([date,arr])=>{
-        if(!date.startsWith(`${yy}-${String(mm+1).padStart(2,'0')}`))return false;
-        const admins=adminAdds[date]||[];
-        return arr.includes(user)||admins.includes(user);
+        if(!date.startsWith(ym)) return false;
+        return arr.includes(user) || (admins[date]||[]).includes(user);
       }).length;
     }
 
     function applySelected(){
-      const data=getData(),admins=getAdminAdds(),y=cur.getFullYear(),m=cur.getMonth(),exist=countThisMonth(currentUser,data,y,m);
-      if(exist+selected.length>8){alert(`한 달 최대 8일(현재 ${exist}일) 초과`);return;}
+      const data = getData(), admins = getAdminAdds();
+      const exist = countThisMonth(currentUser, data);
+      if(exist + selected.length > 8){ alert(`한 달 최대 8일(현재 ${exist}일) 초과`); return; }
       selected.forEach(ds=>{
-        const arr=data[ds]||[], adm=admins[ds]||[];
-        if(arr.length+adm.length<3&&!arr.includes(currentUser)&&!adm.includes(currentUser))arr.push(currentUser);
-        data[ds]=arr;
-      });
-      saveData(data);selected=[];renderCalendar();renderMyList();updateSelectionUI();
-    }
-
-    function renderCalendar(){
-      calBody.innerHTML='';monthLabel.textContent=`${cur.getFullYear()}년 ${cur.getMonth()+1}월`;
-      const first=new Date(cur.getFullYear(),cur.getMonth(),1).getDay(),days=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
-      let row=document.createElement('tr');
-      for(let i=0;i<first;i++)row.appendChild(makeCell(''));
-      const data=getData(),admins=getAdminAdds();
-      for(let d=1;d<=days;d++){
-        if((first+d-1)%7===0&&d!==1){calBody.appendChild(row);row=document.createElement('tr');}
-        const ds=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const arr=data[ds]||[], adm=admins[ds]||[];
-        row.appendChild(makeCell(d,false,ds,arr,adm));
-      }
-      while(row.children.length<7)row.appendChild(makeCell(''));
-      calBody.appendChild(row);updateSelectionUI();
-    }
-
-    function makeCell(day,disabled=false,ds='',arr=[],adm=[]){
-      const merged=arr.concat(adm);
-      const td=document.createElement('td');
-      td.className=disabled?'disabled p-2':'p-2';
-      if(!disabled&&day){
-        if(merged.includes(currentUser)){
-          td.classList.add('bg-red-100');
-          td.onclick=()=>alert('이미 신청한 날짜입니다.');
-        } else if(merged.length>=3){
-          td.classList.add('bg-gray-300','text-gray-500');
-          td.onclick=()=>alert('마감된 날짜입니다.');
-        } else {
-          td.classList.add('cursor-pointer','hover:bg-blue-50');
-          td.onclick=()=>toggleSelect(ds);
+        if(!isWithinPeriod(ds)){ alert('신청 기간이 아닙니다.'); return; }
+        const arr = data[ds]||[], adm = admins[ds]||[];
+        if(arr.length+adm.length<3 && !arr.includes(currentUser) && !adm.includes(currentUser)){
+          arr.push(currentUser);
         }
-      }
-      td.innerHTML=disabled?'':`<div>${day}</div><div class="count text-sm text-gray-600">${merged.length}/3</div>`;
-      return td;
-    }
-
-    function isConsecutive(d){const a=Array.from(new Set(d.map(x=>new Date(x).setHours(0,0,0,0)))).sort((a,b)=>a-b);let r=1;for(let i=1;i<a.length;i++){if(a[i]-a[i-1]===86400000){r++;if(r>3)return false;}else r=1;}return true;}
-
-    function toggleSelect(ds){
-      const i=selected.indexOf(ds),data=getData(),admins=getAdminAdds();
-      const existDates=Object.entries(data).filter(([date,arr])=>{
-        if(!date.startsWith(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`))return false;
-        const adm=admins[date]||[];
-        return arr.includes(currentUser)||adm.includes(currentUser);
-      }).map(([d])=>d);
-      let temp=i>=0?selected.filter(x=>x!==ds):[...selected,ds];
-      if(!isConsecutive(existDates.concat(temp))){alert('연속 신청은 최대 3일까지만 가능합니다.');return;}
-      if(i>=0)selected.splice(i,1);else{if(selected.length>=3){alert('한 번에 최대 3일 선택 가능합니다.');return;}selected.push(ds);}
+        data[ds] = arr;
+      });
+      saveData(data);
+      selected = [];
+      renderCalendar();
+      renderMyList();
       updateSelectionUI();
     }
 
-    function updateSelectionUI(){document.querySelectorAll('#calendar td').forEach(td=>td.classList.remove('bg-blue-200'));selected.forEach(ds=>{document.querySelectorAll('#calendar td').forEach(td=>{if(td.innerText.startsWith(String(Number(ds.slice(-2)))))td.classList.add('bg-blue-200');});});selDatesEl.textContent=selected.join(', ')||'없음';selCountEl.textContent=selected.length;applyBtn.disabled=selected.length===0;}
+    // 달력 그리기
+    function renderCalendar(){
+      calBody.innerHTML = '';
+      monthLabel.textContent = `${cur.getFullYear()}년 ${cur.getMonth()+1}월`;
+      const first = new Date(cur.getFullYear(),cur.getMonth(),1).getDay();
+      const days  = new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+      let row = document.createElement('tr');
+      for(let i=0;i<first;i++) row.appendChild(makeCell(''));
+      const data = getData(), admins = getAdminAdds();
+      for(let d=1; d<=days; d++){
+        if((first+d-1)%7===0 && d!==1){ calBody.appendChild(row); row=document.createElement('tr'); }
+        const ds = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const arr = data[ds]||[], adm = admins[ds]||[];
+        row.appendChild(makeCell(d,false,ds,arr,adm));
+      }
+      while(row.children.length<7) row.appendChild(makeCell(''));
+      calBody.appendChild(row);
+      updateSelectionUI();
+    }
 
+    // 셀 생성
+    function makeCell(day, disabled=false, ds='', arr=[], adm=[]){
+      const merged = arr.concat(adm);
+      const td = document.createElement('td');
+      td.className = disabled ? 'disabled p-2' : 'p-2';
+      if(!disabled && day){
+        if(merged.includes(currentUser)){
+          td.classList.add('bg-red-100');
+          td.onclick = ()=>alert('이미 신청한 날짜입니다.');
+        } else if(merged.length>=3){
+          td.classList.add('bg-gray-300','text-gray-500');
+          td.onclick = ()=>alert('마감된 날짜입니다.');
+        } else if(!isWithinPeriod(ds)){
+          td.classList.add('bg-gray-100','text-gray-400');
+          td.onclick = ()=>alert('신청 기간이 아닙니다.');
+        } else {
+          td.classList.add('cursor-pointer','hover:bg-blue-50');
+          td.onclick = ()=>toggleSelect(ds);
+        }
+      }
+      td.innerHTML = disabled ? '' : `<div>${day}</div><div class="count text-sm text-gray-600">${merged.length}/3</div>`;
+      return td;
+    }
+
+    // 연속 검사
+    function isConsecutive(arr){
+      const a = Array.from(new Set(arr.map(x=>new Date(x).getTime()))).sort((a,b)=>a-b);
+      let run = 1;
+      for(let i=1;i<a.length;i++){
+        if(a[i]-a[i-1]===86400000){ run++; if(run>3) return false; }
+        else run=1;
+      }
+      return true;
+    }
+
+    function toggleSelect(ds){
+      const i = selected.indexOf(ds);
+      const data = getData(), admins = getAdminAdds();
+      const existDates = Object.entries(data).filter(([d,arr])=>{
+        if(!d.startsWith(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`)) return false;
+        return arr.includes(currentUser) || (admins[d]||[]).includes(currentUser);
+      }).map(([d])=>d);
+      let temp = i>=0 ? selected.filter(x=>x!==ds) : [...selected, ds];
+      if(!isConsecutive(existDates.concat(temp))){
+        alert('연속 신청은 최대 3일까지만 가능합니다.');
+        return;
+      }
+      if(i>=0) selected.splice(i,1);
+      else {
+        if(selected.length>=3){
+          alert('한 번에 최대 3일 선택 가능합니다.');
+          return;
+        }
+        selected.push(ds);
+      }
+      updateSelectionUI();
+    }
+
+    // 신청내역(현재 월만)
     function renderMyList(){
-      myList.innerHTML='';
-      const data=getData(),admins=getAdminAdds();
-      // combine dates where currentUser is in data or admins
+      myList.innerHTML = '';
+      const data = getData(), admins = getAdminAdds();
+      const ym = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
       const dates = new Set([
-        ...Object.keys(data).filter(d=>data[d].includes(currentUser)),
-        ...Object.keys(admins).filter(d=>admins[d].includes(currentUser))
+        ...Object.keys(data).filter(d=>d.startsWith(ym) && data[d].includes(currentUser)),
+        ...Object.keys(admins).filter(d=>d.startsWith(ym) && admins[d].includes(currentUser))
       ]);
       Array.from(dates).sort().forEach(date=>{
-        const isAdmin = (admins[date]||[]).includes(currentUser);
+        const isAdm = (admins[date]||[]).includes(currentUser);
         const li = document.createElement('li');
-        li.className='flex justify-between items-center';
-        li.innerHTML = `<span>${date} ${isAdmin?'<span class="ml-2">👑</span>':''}</span><button class="text-red-500">X</button>`;
-        li.querySelector('button').onclick=()=>{
-          if(!confirm('취소할까요?')) return;
-          if(isAdmin) {
-            admins[date] = admins[date].filter(n=>n!==currentUser);
-            if(!admins[date].length) delete admins[date];
-            saveAdminAdds(admins);
-          } else {
-            data[date] = data[date].filter(n=>n!==currentUser);
-            if(!data[date].length) delete data[date];
-            saveData(data);
-          }
-          renderCalendar(); renderMyList();
+        li.className = 'flex justify-between items-center';
+        li.innerHTML = `<span>${date}${isAdm?' 👑':''}</span><button class="text-red-500">X</button>`;
+        li.querySelector('button').onclick = ()=>{ if(!confirm('취소할까요?')) return; 
+            if(isAdm){
+              admins[date] = admins[date].filter(n=>n!==currentUser);
+              if(!admins[date].length) delete admins[date];
+              saveAdminAdds(admins);
+            } else {
+              data[date] = data[date].filter(n=>n!==currentUser);
+              if(!data[date].length) delete data[date];
+              saveData(data);
+            }
+            renderCalendar(); renderMyList();
         };
         myList.appendChild(li);
       });
     }
 
     ['click','keydown','mousemove'].forEach(evt=>document.addEventListener(evt,updateActivity));
-    if(currentUser){updateActivity();showApp();}else showAuth();
+    if(currentUser){ updateActivity(); showApp(); } else showAuth();
   });
   </script>
 </body>

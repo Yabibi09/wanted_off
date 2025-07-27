@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>❤️ NICU wanted off ❤️</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -35,10 +36,7 @@
           <span id="welcome" class="text-lg font-medium"></span>
           <button id="logout" class="px-3 py-1 bg-red-500 text-white rounded-lg shadow">로그아웃</button>
         </div>
-        <!-- 타이머 표시 -->
-        <div class="text-right text-sm text-gray-600">
-          남은 시간: <span id="timer">--:--</span>
-        </div>
+        <div class="text-right text-sm text-gray-600">남은 시간: <span id="timer">--:--</span></div>
         <div class="flex justify-between items-center">
           <button id="prev" class="px-3 py-1 bg-gray-300 rounded-lg">‹ 이전</button>
           <span id="monthLabel" class="text-lg font-semibold"></span>
@@ -59,155 +57,78 @@
       </div>
     </div>
     <!-- 우측: 신청내역 -->
-    <div class="space-y-4 hidden" id="history">
+    <div id="history" class="space-y-4 hidden">
       <h2 class="text-xl font-semibold">신청내역</h2>
       <ul id="myList" class="bg-white p-4 rounded-lg shadow space-y-2"></ul>
     </div>
   </div>
+
   <script>
   window.addEventListener('DOMContentLoaded', () => {
     const INACTIVITY_LIMIT = 10*60*1000;
-    const allowedNames = ["Alice","Bob","Charlie","Delta","Echo"];
+    const allowedNames = ["admin","Alice","Bob","Charlie","Delta","Echo"];
     let currentUser=localStorage.getItem('app_current')||'', cur=new Date(), selected=[];
     let timerInterval;
 
-    const authDiv=document.getElementById('auth'), formLogin=document.getElementById('formLogin'), formRegister=document.getElementById('formRegister'), appDiv=document.getElementById('app'), historyDiv=document.getElementById('history'), welcome=document.getElementById('welcome'), timerEl=document.getElementById('timer'), calBody=document.getElementById('calendar'), monthLabel=document.getElementById('monthLabel'), selDatesEl=document.getElementById('selectedDates'), selCountEl=document.getElementById('selCount'), applyBtn=document.getElementById('applyBtn'), myList=document.getElementById('myList');
+    const authDiv=document.getElementById('auth'), formLogin=document.getElementById('formLogin'), formRegister=document.getElementById('formRegister'),
+          appDiv=document.getElementById('app'), historyDiv=document.getElementById('history'),
+          welcome=document.getElementById('welcome'), timerEl=document.getElementById('timer'), calBody=document.getElementById('calendar'),
+          monthLabel=document.getElementById('monthLabel'), selDatesEl=document.getElementById('selectedDates'), selCountEl=document.getElementById('selCount'),
+          applyBtn=document.getElementById('applyBtn'), myList=document.getElementById('myList');
 
     const getUsers=()=>JSON.parse(localStorage.getItem('app_users')||'[]');
     const saveUsers=u=>localStorage.setItem('app_users',JSON.stringify(u));
-    const getData=()=>JSON.parse(localStorage.getItem('app_data')||'{}');
-    const saveData=d=>localStorage.setItem('app_data',JSON.stringify(d));
+    const getData = ()=>JSON.parse(localStorage.getItem('app_data')||'{}');
+    const saveData = d=>localStorage.setItem('app_data',JSON.stringify(d));
     const updateActivity=()=>localStorage.setItem('lastActivity',Date.now());
 
     function startTimer(){
-      function upd(){
+      function tick(){
         const last=+localStorage.getItem('lastActivity')||0;
-        let diff=INACTIVITY_LIMIT-(Date.now()-last);
-        if(diff<=0){alert('자동 로그아웃 됩니다.');logout();return;}        
+        const diff=INACTIVITY_LIMIT-(Date.now()-last);
+        if(diff<=0){alert('자동 로그아웃 됩니다.'); logout(); return;}
         const m=String(Math.floor(diff/60000)).padStart(2,'0');
         const s=String(Math.floor((diff%60000)/1000)).padStart(2,'0');
         timerEl.textContent=`${m}:${s}`;
       }
-      upd();return setInterval(upd,1000);
+      tick(); return setInterval(tick,1000);
     }
 
     function showAuth(){authDiv.classList.remove('hidden');appDiv.classList.add('hidden');historyDiv.classList.add('hidden');clearInterval(timerInterval);}    
-    function showApp(){if(!currentUser) return showAuth();authDiv.classList.add('hidden');appDiv.classList.remove('hidden');historyDiv.classList.remove('hidden');welcome.textContent=`${currentUser} 선생님 🐥`;updateActivity();timerInterval=startTimer();renderCalendar();renderMyList();updateSelectionUI();}
-    function login(name){currentUser=name;localStorage.setItem('app_current',name);showApp();}
+    function showApp(){
+      if(!currentUser) return showAuth();
+      authDiv.classList.add('hidden'); appDiv.classList.remove('hidden'); historyDiv.classList.remove('hidden');
+      welcome.textContent = `${currentUser} 선생님 🐥`;
+      updateActivity(); timerInterval=startTimer(); renderCalendar(); renderMyList(); updateSelectionUI();
+    }
+
+    function login(name){
+      if(name==='admin'){ return window.location.href='admin.html'; }
+      currentUser=name; localStorage.setItem('app_current',name); showApp();
+    }
     function logout(){localStorage.removeItem('app_current');currentUser='';showAuth();}
 
-    formRegister.onsubmit=e=>{e.preventDefault();const name=document.getElementById('regName').value.trim(),pw=document.getElementById('regPw').value;if(!allowedNames.includes(name)){alert('허용된 이름이 아닙니다.');return;}let u=getUsers();if(u.find(x=>x.name===name)){alert('이미 존재');return;}u.push({name,pw});saveUsers(u);alert('가입 완료');formRegister.classList.add('hidden');formLogin.classList.remove('hidden');};
-    formLogin.onsubmit=e=>{e.preventDefault();const name=document.getElementById('loginName').value.trim(),pw=document.getElementById('loginPw').value;const u=getUsers().find(x=>x.name===name&&x.pw===pw);if(!u){alert('로그인 실패');return;}login(name);};
-    document.getElementById('showLogin').onclick=()=>{formLogin.classList.remove('hidden');formRegister.classList.add('hidden');showAuth();};
-    document.getElementById('showRegister').onclick=()=>{formRegister.classList.remove('hidden');formLogin.classList.add('hidden');showAuth();};
+    formRegister.onsubmit=e=>{e.preventDefault();const n=document.getElementById('regName').value.trim(),p=document.getElementById('regPw').value;if(!allowedNames.includes(n)){alert('허용된 이름이 아닙니다.');return;}let u=getUsers();if(u.find(x=>x.name===n)){alert('이미 존재');return;}u.push({name:n,pw:p});saveUsers(u);alert('가입 완료');formRegister.classList.add('hidden');formLogin.classList.remove('hidden');};
+    formLogin.onsubmit = e=>{e.preventDefault();const n=document.getElementById('loginName').value.trim(),p=document.getElementById('loginPw').value;const u=getUsers().find(x=>x.name===n&&x.pw===p);if(!u){alert('로그인 실패');return;}login(n);};
+    document.getElementById('showLogin').onclick = ()=>{formLogin.classList.remove('hidden');formRegister.classList.add('hidden');showAuth();};
+    document.getElementById('showRegister').onclick = ()=>{formRegister.classList.remove('hidden');formLogin.classList.add('hidden');showAuth();};
     document.getElementById('logout').onclick=logout;
     document.getElementById('prev').onclick=()=>{cur.setMonth(cur.getMonth()-1);renderCalendar();};
     document.getElementById('next').onclick=()=>{cur.setMonth(cur.getMonth()+1);renderCalendar();};
     applyBtn.onclick=()=>applySelected();
 
-    function countThisMonth(user,data,y,m){return Object.entries(data).filter(([date,arr])=>{if(!arr.includes(user))return false;const [yy,mm]=date.split('-').map(Number);return yy===y&&mm-1===m;}).length;}
-
-    function applySelected(){const data=getData(),y=cur.getFullYear(),m=cur.getMonth(),exist=countThisMonth(currentUser,data,y,m);if(exist+selected.length>8){alert(`한 달 최대 8일(현재 ${exist}일) 초과`);return;}selected.forEach(ds=>{const arr=data[ds]||[];if(arr.length<3&&!arr.includes(currentUser))arr.push(currentUser);data[ds]=arr;});saveData(data);selected=[];renderCalendar();renderMyList();updateSelectionUI();}
+    function countThisMonth(user,data,yy,mm){return Object.entries(data).filter(([date,arr])=>arr.includes(user)&&date.startsWith(`${yy}-${String(mm+1).padStart(2,'0')}`)).length;}
+    function applySelected(){const d=getData(),yy=cur.getFullYear(),mm=cur.getMonth(),exist=countThisMonth(currentUser,d,yy,mm);if(exist+selected.length>8){alert(`한 달 최대 8일(현재 ${exist}일) 초과`);return;}selected.forEach(ds=>{let arr=d[ds]||[];if(arr.length<3&&!arr.includes(currentUser))arr.push(currentUser);d[ds]=arr;});saveData(d);selected=[];renderCalendar();renderMyList();updateSelectionUI();}
 
     function renderCalendar(){calBody.innerHTML='';monthLabel.textContent=`${cur.getFullYear()}년 ${cur.getMonth()+1}월`;const first=new Date(cur.getFullYear(),cur.getMonth(),1).getDay(),days=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();let row=document.createElement('tr');for(let i=0;i<first;i++)row.appendChild(makeCell(''));const data=getData();for(let d=1;d<=days;d++){if((first+d-1)%7===0&&d!==1){calBody.appendChild(row);row=document.createElement('tr');}const ds=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,arr=data[ds]||[];row.appendChild(makeCell(d,false,ds,arr));}while(row.children.length<7)row.appendChild(makeCell(''));calBody.appendChild(row);updateSelectionUI();}
 
-    function makeCell(day, disabled=false, ds='', arr=[]) {
-      const td = document.createElement('td');
-      td.className = disabled ? 'disabled p-2' : 'p-2';
-      if (!disabled && day) {
-        if (arr.includes(currentUser)) {
-          td.classList.add('bg-red-100');
-          td.onclick = () => alert('이미 신청한 날짜입니다.');
-        } else {
-          td.classList.add('cursor-pointer','hover:bg-blue-50');
-          td.onclick = () => toggleSelect(ds);
-        }
-      }
-      td.innerHTML = disabled ? '' : `<div>${day}</div><div class="count text-sm text-gray-600">${arr.length}/3</div>`;
-      return td;
-    }
-
-    // 연속 검사: 주어진 날짜 배열에 연속된 날짜가 4일 이상 있는지 체크
-    function isConsecutive(dates) {
-      const ds = dates.map(d => new Date(d).setHours(0,0,0,0));
-      const uniq = Array.from(new Set(ds)).sort((a,b) => a-b);
-      let run = 1;
-      for (let i = 1; i < uniq.length; i++) {
-        if (uniq[i] - uniq[i-1] === 86400000) {
-          run++;
-          if (run > 3) return false;
-        } else {
-          run = 1;
-        }
-      }
-      return true;
-    }
-
-    // 날짜 선택 토글
-    function toggleSelect(ds) {
-      const idx = selected.indexOf(ds);
-      const data = getData();
-      const year = cur.getFullYear(), month = cur.getMonth();
-      // 기존 신청된 날짜 (현재 월)
-      const existing = Object.keys(data).filter(date => {
-        const arr = data[date];
-        if (!arr.includes(currentUser)) return false;
-        const [y,m] = date.split('-').map(Number);
-        return y === year && m-1 === month;
-      });
-      let temp;
-      if (idx >= 0) {
-        temp = selected.filter(d => d !== ds);
-      } else {
-        if (selected.length >= 3) { alert('한 번에 최대 3일 선택 가능합니다.'); return; }
-        temp = [...selected, ds];
-      }
-      // 연속 검사: 기존 + 선택 예정
-      const combined = existing.concat(temp);
-      if (!isConsecutive(combined)) {
-        alert('연속 신청은 최대 3일까지만 가능합니다.');
-        return;
-      }
-      // 최종 선택 적용
-      if (idx >= 0) selected.splice(idx,1);
-      else selected.push(ds);
-      updateSelectionUI();
-    }
-
-    // 화면 내역 렌더
-    function updateSelectionUI() {
-      document.querySelectorAll('#calendar td').forEach(td => td.classList.remove('bg-blue-200'));
-      selected.forEach(ds => {
-        document.querySelectorAll('#calendar td').forEach(td => {
-          if (td.innerText.startsWith(String(Number(ds.slice(-2))))) td.classList.add('bg-blue-200');
-        });
-      });
-      selDatesEl.textContent = selected.join(', ') || '없음';
-      selCountEl.textContent = selected.length;
-      applyBtn.disabled = selected.length === 0;
-    }
-
-    // 내 신청 내역 렌더
-    function renderMyList() {
-      myList.innerHTML = '';
-      const data = getData();
-      Object.keys(data).filter(date => data[date].includes(currentUser)).sort().forEach(date => {
-        const li = document.createElement('li');
-        li.className = 'flex justify-between items-center';
-        li.innerHTML = `<span>${date}</span><button class="text-red-500">X</button>`;
-        li.querySelector('button').onclick = () => {
-          if (!confirm('취소할까요?')) return;
-          data[date] = data[date].filter(n => n !== currentUser);
-          if (data[date].length === 0) delete data[date];
-          saveData(data);
-          renderCalendar(); renderMyList();
-        };
-        myList.appendChild(li);
-      });
-    }
-
-    ['click','keydown','mousemove'].forEach(evt => document.addEventListener(evt, updateActivity));
-    if (currentUser) { updateActivity(); showApp(); } else showAuth();
+    function makeCell(day,disabled=false,ds='',arr=[]){const td=document.createElement('td');td.className=disabled?'disabled p-2':'p-2';if(!disabled&&day){if(arr.includes(currentUser)){td.classList.add('bg-red-100');td.onclick=()=>alert('이미 신청한 날짜입니다.');}else{td.classList.add('cursor-pointer','hover:bg-blue-50');td.onclick=()=>toggleSelect(ds);}}td.innerHTML=disabled?'':`<div>${day}</div><div class="text-sm text-gray-600">${arr.length}/3</div>`;return td;}
+    function isConsecutive(d){const a=Array.from(new Set(d.map(x=>new Date(x).setHours(0,0,0,0)))).sort((a,b)=>a-b);let r=1;for(let i=1;i<a.length;i++){if(a[i]-a[i-1]===86400000){r++;if(r>3)return false;}else r=1;}return true;}
+    function toggleSelect(ds){const i=selected.indexOf(ds),data=getData();const exist=Object.keys(data).filter(date=>data[date].includes(currentUser)&&date.startsWith(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`));let temp=i>=0?selected.filter(x=>x!==ds):[...selected,ds];if(!isConsecutive(exist.concat(temp))){alert('연속 신청은 최대 3일까지만 가능합니다.');return;}if(i>=0)selected.splice(i,1);else{if(selected.length>=3){alert('최대 3일 선택 가능합니다.');return;}selected.push(ds);}updateSelectionUI();}
+    function updateSelectionUI(){document.querySelectorAll('#calendar td').forEach(td=>td.classList.remove('bg-blue-200'));selected.forEach(ds=>{document.querySelectorAll('#calendar td').forEach(td=>{if(td.innerText.startsWith(String(Number(ds.slice(-2)))))td.classList.add('bg-blue-200');});});selDatesEl.textContent=selected.join(', ')||'없음';selCountEl.textContent=selected.length;applyBtn.disabled=selected.length===0;}
+    function renderMyList(){myList.innerHTML='';const data=getData();Object.keys(data).filter(d=>data[d].includes(currentUser)).sort().forEach(date=>{const li=document.createElement('li');li.className='flex justify-between items-center';li.innerHTML=`<span>${date}</span><button class="text-red-500">X</button>`;li.querySelector('button').onclick=()=>{if(!confirm('취소할까요?'))return;data[date]=data[date].filter(x=>x!==currentUser);if(!data[date].length)delete data[date];saveData(data);renderCalendar();renderMyList();};myList.appendChild(li);});}
+    ['click','keydown','mousemove'].forEach(e=>document.addEventListener(e,updateActivity));
+    if(currentUser){updateActivity();showApp();}else showAuth();
   });
   </script>
 </body>

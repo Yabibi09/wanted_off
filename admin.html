@@ -90,8 +90,15 @@
     const getPeriods    = () => JSON.parse(localStorage.getItem('app_periods')  || '{}');
     const savePeriods   = p => localStorage.setItem('app_periods', JSON.stringify(p));
 
-    const allowedNames = [ /* same whitelist array as before */ ];
-
+     // Whitelist names restored
+      const allowedNames = [
+        "천지원","이시향","이슬비","이영숙","구슬비","김정현","고영화","오현지","이지수",
+        "전혜선","조화연","윤수진","최원정","권나경","김주현","김유진","배인경","이혜수",
+        "서영서","홍수아","박주현","엄나혜","이수지","정혜아","이시은","백지연","허자령",
+        "김수민","이다경","신옥비","박인희","신주영","최은방","길용순","한은진","심나영",
+        "박희연","원유미","인휘"
+      ];
+    
     // DOM
     const adminCal   = document.getElementById('adminCalendar');
     const detailDate = document.getElementById('detailDate');
